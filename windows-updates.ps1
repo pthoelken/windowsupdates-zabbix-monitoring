@@ -14,7 +14,7 @@ $PSModuleAutoLoadingPreference = 'None'
 
 function Out-Int([int]$v){ [Console]::Out.Write($v); exit 0 }
 
-# --- Fast path: Reboot flag (kein Cmdlet, nur .NET) ---
+# --- Fast path: Reboot flag ---
 if ($Mode -eq 'Reboot') {
     try {
         $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
@@ -26,8 +26,8 @@ if ($Mode -eq 'Reboot') {
     } catch { Out-Int 0 }
 }
 
-# --- Logging nur bei Fehlern (keine Ausgabe an Zabbix) ---
-$DiagFile = 'C:\ProgramData\Zabbix\winupdates_diag.log'
+# --- Logging when error (no output to zabbix) ---
+$DiagFile = 'C:\Program Files\Zabbix Agent 2\winupdates_diag.log'
 function LogDiag($msg) {
     try {
         $ts = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
@@ -37,7 +37,7 @@ function LogDiag($msg) {
     } catch { }
 }
 
-# --- Dienste sicherstellen (Starttyp Disabled -> Manual), ohne Cmdlets
+# --- Checkup services (Starttyp Disabled -> Manual)
 function Ensure-Service($name){
     try {
         & sc.exe config $name start= demand *>$null
@@ -49,13 +49,13 @@ function Ensure-Service($name){
 Ensure-Service 'wuauserv'
 Ensure-Service 'BITS'
 
-# --- COM-Suche (robust, mehrere Versuche) ---
+# --- COM-Search (stable, multiple trys) ---
 function Get-CountsViaCOM {
     try {
         $session  = New-Object -ComObject Microsoft.Update.Session
         $searcher = $session.CreateUpdateSearcher()
 
-        # Policy (per Registry, ohne Cmdlets)
+        # Policy (with Registry, without Cmdlets)
         $lm = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine,[Microsoft.Win32.RegistryView]::Default)
         $auKey = $lm.OpenSubKey('SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU')
         $wuKey = $lm.OpenSubKey('SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate')
@@ -112,7 +112,7 @@ function Get-CountsViaCOM {
 
 $counts = Get-CountsViaCOM
 
-# --- Finale Ausgabe: nur Zahlen; bei Fehler -> 0 ---
+# --- Final output: just numbers, at error -> 0 ---
 if ($null -eq $counts) {
     LogDiag "Alle Versuche fehlgeschlagen. Rückgabe 0 für Zabbix."
     switch ($Mode) {
