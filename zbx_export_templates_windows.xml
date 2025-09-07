@@ -3,13 +3,13 @@
     <version>7.2</version>
     <template_groups>
         <template_group>
-            <uuid>6c0c9a3f9b4a4f2d8a5c0a6e3b9a1f42</uuid>
+            <uuid>0b381a46614340d49124dc405fa4f3d8</uuid>
             <name>Templates</name>
         </template_group>
     </template_groups>
     <templates>
         <template>
-            <uuid>9b7a2a6d1c3f4e1b9a0c2d3e4f5a6b7c</uuid>
+            <uuid>992fd1f2ed964ab9b7de0cf93e35b509</uuid>
             <template>Template App Windows Updates</template>
             <name>Template App Windows Updates</name>
             <groups>
@@ -19,7 +19,7 @@
             </groups>
             <items>
                 <item>
-                    <uuid>c1f2a3b4c5d6e7f81920304050607081</uuid>
+                    <uuid>25897aade3234c58b4e624534867fbb0</uuid>
                     <name>Security Updates</name>
                     <key>win.updates.security</key>
                     <delay>900</delay>
@@ -32,7 +32,7 @@
                     </tags>
                 </item>
                 <item>
-                    <uuid>d2e3f4a5b6c7d8e90123456789abcdef</uuid>
+                    <uuid>05c10623ea0b49b2a4baa698778dea0d</uuid>
                     <name>Non-Critical System Updates</name>
                     <key>win.updates.nonsec</key>
                     <delay>900</delay>
@@ -45,7 +45,7 @@
                     </tags>
                 </item>
                 <item>
-                    <uuid>a3b4c5d6e7f81920a1b2c3d4e5f60718</uuid>
+                    <uuid>fc1ca8809890412b9558ca105a3a4101</uuid>
                     <name>All Available Updates</name>
                     <key>win.updates.all</key>
                     <delay>900</delay>
@@ -58,7 +58,7 @@
                     </tags>
                 </item>
                 <item>
-                    <uuid>e4f5a6b7c8d9e0f1a2b3c4d5e6f70819</uuid>
+                    <uuid>437b0b68c8104bab94b2df617197e7e0</uuid>
                     <name>Reboot Required regarding Windows Updates</name>
                     <key>win.reboot</key>
                     <delay>900</delay>
@@ -71,7 +71,7 @@
                     </tags>
                     <triggers>
                         <trigger>
-                            <uuid>11112222333344445555666677778888</uuid>
+                            <uuid>ec54f40182074899af41b330962b2d2f</uuid>
                             <expression>last(/Template App Windows Updates/win.reboot)&gt;0</expression>
                             <name>Reboot required on {HOST.NAME} regarding Windows updates</name>
                             <priority>WARNING</priority>
@@ -84,21 +84,21 @@
     </templates>
     <triggers>
         <trigger>
-            <uuid>aaaa1111bbbb2222cccc3333dddd4444</uuid>
+            <uuid>f0faf37a4b064eb19ae484be5fabd1b4</uuid>
             <expression>last(/Template App Windows Updates/win.updates.security)&gt;0 and last(/Template App Windows Updates/win.updates.nonsec)&gt;0</expression>
             <name>{ITEM.LASTVALUE1} security and {ITEM.LASTVALUE2} regular updates on {HOST.NAME}</name>
             <priority>WARNING</priority>
             <manual_close>YES</manual_close>
         </trigger>
         <trigger>
-            <uuid>eeee5555ffff6666aaaa7777bbbb8888</uuid>
+            <uuid>f6db54f72ae84597ade68138bef8440d</uuid>
             <expression>last(/Template App Windows Updates/win.updates.nonsec)&gt;0 and last(/Template App Windows Updates/win.updates.security)=0</expression>
             <name>{ITEM.LASTVALUE} regular system updates on {HOST.NAME}</name>
             <priority>INFO</priority>
             <manual_close>YES</manual_close>
         </trigger>
         <trigger>
-            <uuid>9999aaaa0000bbbb1111cccc2222dddd</uuid>
+            <uuid>eed9f8fa03c84d639b84bdc61de43daa</uuid>
             <expression>last(/Template App Windows Updates/win.updates.security)&gt;0 and last(/Template App Windows Updates/win.updates.nonsec)=0</expression>
             <name>{ITEM.LASTVALUE} security updates on {HOST.NAME}</name>
             <priority>WARNING</priority>
