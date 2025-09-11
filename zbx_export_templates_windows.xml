@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <zabbix_export>
-    <version>7.2</version>
+    <version>7.4</version>
     <template_groups>
         <template_group>
             <uuid>0b381a46614340d49124dc405fa4f3d8</uuid>
@@ -19,50 +19,12 @@
             </groups>
             <items>
                 <item>
-                    <uuid>25897aade3234c58b4e624534867fbb0</uuid>
-                    <name>Security Updates</name>
-                    <key>win.updates.security</key>
-                    <delay>900</delay>
-                    <history>90d</history>
-                    <tags>
-                        <tag>
-                            <tag>Application</tag>
-                            <value>WindowsUpdate</value>
-                        </tag>
-                    </tags>
-                </item>
-                <item>
-                    <uuid>05c10623ea0b49b2a4baa698778dea0d</uuid>
-                    <name>Non-Critical System Updates</name>
-                    <key>win.updates.nonsec</key>
-                    <delay>900</delay>
-                    <history>90d</history>
-                    <tags>
-                        <tag>
-                            <tag>Application</tag>
-                            <value>WindowsUpdate</value>
-                        </tag>
-                    </tags>
-                </item>
-                <item>
-                    <uuid>fc1ca8809890412b9558ca105a3a4101</uuid>
-                    <name>All Available Updates</name>
-                    <key>win.updates.all</key>
-                    <delay>900</delay>
-                    <history>90d</history>
-                    <tags>
-                        <tag>
-                            <tag>Application</tag>
-                            <value>WindowsUpdate</value>
-                        </tag>
-                    </tags>
-                </item>
-                <item>
                     <uuid>437b0b68c8104bab94b2df617197e7e0</uuid>
                     <name>Reboot Required regarding Windows Updates</name>
                     <key>win.reboot</key>
                     <delay>900</delay>
                     <history>90d</history>
+                    <timeout>30s</timeout>
                     <tags>
                         <tag>
                             <tag>Application</tag>
@@ -78,6 +40,48 @@
                             <manual_close>YES</manual_close>
                         </trigger>
                     </triggers>
+                </item>
+                <item>
+                    <uuid>fc1ca8809890412b9558ca105a3a4101</uuid>
+                    <name>All Available Updates</name>
+                    <key>win.updates.all</key>
+                    <delay>900</delay>
+                    <history>90d</history>
+                    <timeout>30s</timeout>
+                    <tags>
+                        <tag>
+                            <tag>Application</tag>
+                            <value>WindowsUpdate</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>05c10623ea0b49b2a4baa698778dea0d</uuid>
+                    <name>Non-Critical System Updates</name>
+                    <key>win.updates.nonsec</key>
+                    <delay>900</delay>
+                    <history>90d</history>
+                    <timeout>30s</timeout>
+                    <tags>
+                        <tag>
+                            <tag>Application</tag>
+                            <value>WindowsUpdate</value>
+                        </tag>
+                    </tags>
+                </item>
+                <item>
+                    <uuid>25897aade3234c58b4e624534867fbb0</uuid>
+                    <name>Security Updates</name>
+                    <key>win.updates.security</key>
+                    <delay>900</delay>
+                    <history>90d</history>
+                    <timeout>30s</timeout>
+                    <tags>
+                        <tag>
+                            <tag>Application</tag>
+                            <value>WindowsUpdate</value>
+                        </tag>
+                    </tags>
                 </item>
             </items>
         </template>
