@@ -1,10 +1,9 @@
 <#
   All-in-one installer for Windows Updates monitoring with Zabbix Agent 2.
-  - Ensures PSWindowsUpdate module is installed
-  - Ensures Git for Windows is installed (winget -> choco -> standalone via GitHub API)
-  - Deploys UserParameters + PowerShell script
-  - Restarts "Zabbix Agent 2"
-  - Emits SUCCESS/ERROR log lines with timestamps
+  FIXED:
+  - Ensures Chocolatey is installed before using it
+  - Keeps PowerShell window open on errors
+  - Git fallback always uses latest release via GitHub API
 #>
 
 Param(
@@ -15,103 +14,118 @@ Param(
 $ErrorActionPreference = "Stop"
 
 function TS { Get-Date -Format "yyyy-MM-dd HH:mm:ss" }
-function OK($msg)  { Write-Host ("SUCCESS | {0} | {1}" -f (TS), $msg) -ForegroundColor Green }
-function ERR($msg) { Write-Host ("ERROR   | {0} | {1}" -f (TS), $msg) -ForegroundColor Red }
+function OK($m)   { Write-Host ("SUCCESS | {0} | {1}" -f (TS), $m) -ForegroundColor Green }
+function WARN($m) { Write-Host ("WARN    | {0} | {1}" -f (TS), $m) -ForegroundColor Yellow }
+function FAIL($m) {
+  Write-Host ("ERROR   | {0} | {1}" -f (TS), $m) -ForegroundColor Red
+  Write-Host ""
+  Read-Host "Press ENTER to exit"
+  exit 1
+}
 
-# --- Admin check -----------------------------------------------------------
+# --- Admin check ----------------------------------------------------------
 $isAdmin = ([Security.Principal.WindowsPrincipal] `
   [Security.Principal.WindowsIdentity]::GetCurrent()
 ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
 if (-not $isAdmin) {
-  ERR "Please run this PowerShell as Administrator."
-  exit 1
+  FAIL "Please run this PowerShell session as Administrator."
 }
 
 try {
-  # --- Ensure folders ------------------------------------------------------
-  $ZbxBase    = "C:\Program Files\Zabbix Agent 2"
-  $ZbxConfD  = Join-Path $ZbxBase "zabbix_agent2.d"
-  $ZbxScripts= Join-Path $ZbxBase "scripts"
+  # --- Zabbix folders -----------------------------------------------------
+  $ZbxBase     = "C:\Program Files\Zabbix Agent 2"
+  $ZbxConfD   = Join-Path $ZbxBase "zabbix_agent2.d"
+  $ZbxScripts = Join-Path $ZbxBase "scripts"
 
   if (-not (Test-Path $ZbxBase)) {
-    ERR "Zabbix Agent 2 base folder not found: $ZbxBase"
-    exit 1
+    FAIL "Zabbix Agent 2 not found at $ZbxBase"
   }
 
-  if (-not (Test-Path $ZbxConfD))   { New-Item -ItemType Directory -Path $ZbxConfD   -Force | Out-Null }
-  if (-not (Test-Path $ZbxScripts)) { New-Item -ItemType Directory -Path $ZbxScripts -Force | Out-Null }
+  New-Item -ItemType Directory -Path $ZbxConfD   -Force | Out-Null
+  New-Item -ItemType Directory -Path $ZbxScripts -Force | Out-Null
+  OK "Zabbix Agent 2 directories verified."
 
-  OK "Zabbix Agent 2 folders verified."
-
-  # --- Ensure PSGallery & NuGet --------------------------------------------
+  # --- PSGallery / NuGet --------------------------------------------------
   if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
     Register-PSRepository -Default
-    OK "Registered PSGallery."
-  } else {
-    OK "PSGallery already registered."
+    OK "PSGallery registered."
   }
 
   if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
     Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force | Out-Null
-    OK "NuGet package provider installed."
-  } else {
-    OK "NuGet package provider present."
+    OK "NuGet provider installed."
   }
 
-  # --- Install PSWindowsUpdate --------------------------------------------
+  # --- PSWindowsUpdate ----------------------------------------------------
   if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
-    try {
-      Install-Module -Name PSWindowsUpdate -Force -AllowClobber | Out-Null
-      OK "Installed PSWindowsUpdate (system scope)."
-    } catch {
-      Install-Module -Name PSWindowsUpdate -Scope CurrentUser -Force -AllowClobber | Out-Null
-      OK "Installed PSWindowsUpdate (CurrentUser scope)."
-    }
+    Install-Module PSWindowsUpdate -Force -AllowClobber | Out-Null
+    OK "PSWindowsUpdate installed."
   } else {
-    OK "PSWindowsUpdate already installed."
+    OK "PSWindowsUpdate already present."
   }
 
   Import-Module PSWindowsUpdate -Force
-  if (Get-Command Get-WindowsUpdate -ErrorAction SilentlyContinue) {
-    OK "Get-WindowsUpdate available."
-  } else {
-    ERR "PSWindowsUpdate imported but Get-WindowsUpdate not found."
+  if (-not (Get-Command Get-WindowsUpdate -ErrorAction SilentlyContinue)) {
+    FAIL "PSWindowsUpdate installed but Get-WindowsUpdate not available."
   }
+  OK "Get-WindowsUpdate verified."
 
-  # --- Ensure Git for Windows ---------------------------------------------
+  # --- Git detection ------------------------------------------------------
   function Test-Git { [bool](Get-Command git.exe -ErrorAction SilentlyContinue) }
 
   if (-not (Test-Git)) {
     $installed = $false
 
-    # winget
+    # --- winget -----------------------------------------------------------
     if (Get-Command winget.exe -ErrorAction SilentlyContinue) {
       try {
-        winget install --id Git.Git -e --source winget --silent `
+        winget install --id Git.Git -e --silent `
           --accept-source-agreements --accept-package-agreements
-        Start-Sleep -Seconds 3
-        if (Test-Git) { $installed = $true; OK "Git installed via winget." }
-      } catch {}
+        Start-Sleep 3
+        if (Test-Git) {
+          OK "Git installed via winget."
+          $installed = $true
+        }
+      } catch {
+        WARN "winget Git install failed."
+      }
     }
 
-    # chocolatey
-    if (-not $installed -and (Get-Command choco.exe -ErrorAction SilentlyContinue)) {
-      try {
-        choco install git -y --no-progress
-        Start-Sleep -Seconds 3
-        if (Test-Git) { $installed = $true; OK "Git installed via chocolatey." }
-      } catch {}
-    }
-
-    # --- Fallback: standalone installer (ALWAYS LATEST) -------------------
+    # --- Chocolatey bootstrap (FORCE) ------------------------------------
     if (-not $installed) {
+      if (-not (Get-Command choco.exe -ErrorAction SilentlyContinue)) {
+        OK "Chocolatey not found. Installing Chocolatey..."
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-Expression ((New-Object Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        Start-Sleep 5
+      }
+
+      if (Get-Command choco.exe -ErrorAction SilentlyContinue) {
+        try {
+          choco install git -y --no-progress
+          Start-Sleep 3
+          if (Test-Git) {
+            OK "Git installed via Chocolatey."
+            $installed = $true
+          }
+        } catch {
+          WARN "Chocolatey Git install failed."
+        }
+      } else {
+        WARN "Chocolatey installation failed."
+      }
+    }
+
+    # --- Fallback: GitHub API (ALWAYS LATEST) ------------------------------
+    if (-not $installed) {
+      OK "Using standalone GitHub installer fallback."
+
+      $tmp = New-Item -ItemType Directory `
+        -Path (Join-Path $env:TEMP ("git-inst-" + [guid]::NewGuid())) -Force
+
       try {
-        $tmp = New-Item -ItemType Directory `
-          -Path (Join-Path $env:TEMP ("git-inst-" + [guid]::NewGuid())) -Force
-
-        $gitExe = Join-Path $tmp.FullName "Git-Setup-x64.exe"
-
         $release = Invoke-RestMethod `
           -Uri "https://api.github.com/repos/git-for-windows/git/releases/latest" `
           -Headers @{ "User-Agent" = "zabbix-installer" }
@@ -121,60 +135,60 @@ try {
           Select-Object -First 1
 
         if (-not $asset) {
-          throw "No 64-bit Git installer found in latest GitHub release."
+          FAIL "No 64-bit Git installer found in latest GitHub release."
         }
 
+        $gitExe = Join-Path $tmp.FullName $asset.name
         Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $gitExe
         & $gitExe /VERYSILENT /NORESTART | Out-Null
+        Start-Sleep 5
 
-        Start-Sleep -Seconds 5
         if (Test-Git) {
-          $installed = $true
           OK ("Git installed via standalone installer ({0})." -f $asset.name)
+          $installed = $true
+        } else {
+          FAIL "Git installer executed but git.exe not found afterwards."
         }
-
+      }
+      finally {
         Remove-Item -Path $tmp.FullName -Recurse -Force -ErrorAction SilentlyContinue
-      } catch {
-        ERR "Failed to install Git via fallback: $($_.Exception.Message)"
       }
     }
 
     if (-not $installed) {
-      ERR "Could not install Git automatically. Please install Git for Windows manually."
-      exit 1
+      FAIL "Git could not be installed by any method."
     }
   } else {
-    OK "Git is present."
+    OK "Git already present."
   }
 
-  # --- Download monitoring files ------------------------------------------
+  # --- Deploy monitoring files -------------------------------------------
   $ps1Dst  = Join-Path $ZbxScripts "windows-updates.ps1"
   $confDst = Join-Path $ZbxConfD   "windows-updates.conf"
 
   Invoke-WebRequest -Uri $Ps1Url  -OutFile $ps1Dst
   Invoke-WebRequest -Uri $ConfUrl -OutFile $confDst
-  OK "Downloaded monitoring files to Zabbix Agent 2 directories."
+  OK "Monitoring files deployed."
 
-  # --- Restart Zabbix Agent 2 ---------------------------------------------
-  $svc = Get-Service -Name "Zabbix Agent 2" -ErrorAction Stop
+  # --- Restart Zabbix Agent 2 --------------------------------------------
+  $svc = Get-Service "Zabbix Agent 2" -ErrorAction Stop
   if ($svc.Status -eq 'Running') {
-    Restart-Service -Name "Zabbix Agent 2" -Force
+    Restart-Service "Zabbix Agent 2" -Force
   } else {
-    Start-Service -Name "Zabbix Agent 2"
+    Start-Service "Zabbix Agent 2"
   }
 
-  Start-Sleep -Seconds 2
+  Start-Sleep 2
   $svc.Refresh()
-  if ($svc.Status -eq 'Running') {
-    OK "Zabbix Agent 2 restarted successfully."
-  } else {
-    ERR "Zabbix Agent 2 is not running after restart."
-    exit 1
+  if ($svc.Status -ne 'Running') {
+    FAIL "Zabbix Agent 2 failed to start."
   }
 
-  OK "All tasks completed successfully."
+  OK "Zabbix Agent 2 restarted successfully."
+  OK "Installation completed successfully."
+  Write-Host ""
+  Read-Host "Press ENTER to exit"
 }
 catch {
-  ERR $_.Exception.Message
-  exit 1
+  FAIL $_.Exception.Message
 }
