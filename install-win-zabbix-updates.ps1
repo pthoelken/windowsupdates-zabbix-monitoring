@@ -1,15 +1,22 @@
 <#
   All-in-one installer for Windows Updates monitoring with Zabbix Agent 2.
-  FIXED:
-  - Ensures Chocolatey is installed before using it
-  - Keeps PowerShell window open on errors
-  - Git fallback always uses latest release via GitHub API
+
+  FIXES INCLUDED:
+  - ExecutionPolicy bypass (Process scope only)
+  - Chocolatey is force-installed before use
+  - Git fallback uses GitHub API (always latest)
+  - Terminal stays open on errors
 #>
 
 Param(
   [string]$Ps1Url  = "https://raw.githubusercontent.com/pthoelken/windowsupdates-zabbix-monitoring/refs/heads/main/windows-updates.ps1",
   [string]$ConfUrl = "https://raw.githubusercontent.com/pthoelken/windowsupdates-zabbix-monitoring/refs/heads/main/windows-updates.conf"
 )
+
+# --- ExecutionPolicy safe override (process only) -------------------------
+try {
+  Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+} catch {}
 
 $ErrorActionPreference = "Stop"
 
@@ -65,11 +72,16 @@ try {
     OK "PSWindowsUpdate already present."
   }
 
-  Import-Module PSWindowsUpdate -Force
-  if (-not (Get-Command Get-WindowsUpdate -ErrorAction SilentlyContinue)) {
-    FAIL "PSWindowsUpdate installed but Get-WindowsUpdate not available."
+  try {
+    Import-Module PSWindowsUpdate -Force -ErrorAction Stop
+    OK "PSWindowsUpdate module imported."
+  } catch {
+    FAIL "PSWindowsUpdate is installed but blocked by ExecutionPolicy."
   }
-  OK "Get-WindowsUpdate verified."
+
+  if (-not (Get-Command Get-WindowsUpdate -ErrorAction SilentlyContinue)) {
+    FAIL "Get-WindowsUpdate command not available after import."
+  }
 
   # --- Git detection ------------------------------------------------------
   function Test-Git { [bool](Get-Command git.exe -ErrorAction SilentlyContinue) }
@@ -92,7 +104,7 @@ try {
       }
     }
 
-    # --- Chocolatey bootstrap (FORCE) ------------------------------------
+    # --- Chocolatey bootstrap (FORCED) -----------------------------------
     if (-not $installed) {
       if (-not (Get-Command choco.exe -ErrorAction SilentlyContinue)) {
         OK "Chocolatey not found. Installing Chocolatey..."
